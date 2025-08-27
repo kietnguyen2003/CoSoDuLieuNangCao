@@ -4,41 +4,59 @@ import type React from "react"
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { authAPI } from "@/lib/api"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
+    setIsLoading(true)
 
-    // Mock authentication logic
-    const userRoles = {
-      "customer@clinic.com": "customer",
-      "receptionist@clinic.com": "receptionist",
-      "doctor@clinic.com": "doctor",
-      "accountant@clinic.com": "accountant",
-      "manager@clinic.com": "manager",
-      "executive@clinic.com": "executive",
-    }
+    try {
+      const response = await authAPI.login({
+        ten_dang_nhap: email,
+        mat_khau: password,
+      })
 
-    const role = userRoles[email as keyof typeof userRoles]
-
-    if (role && password === "password123") {
-      // Store user info in localStorage (in real app, use proper auth)
-      localStorage.setItem("userRole", role)
-      localStorage.setItem("userEmail", email)
-      router.push(`/${role}`)
-    } else {
-      setError("Invalid email or password")
+      if (response.success && response.data) {
+        // Store authentication data
+        localStorage.setItem("authToken", response.data.token)
+        localStorage.setItem("userRole", response.data.user.role.toLowerCase())
+        localStorage.setItem("userEmail", response.data.user.email || email)
+        localStorage.setItem("userId", response.data.user.ma_user)
+        
+        // Navigate to appropriate dashboard
+        const roleMap: Record<string, string> = {
+          "CUSTOMER": "customer",
+          "DOCTOR": "doctor", 
+          "RECEPTIONIST": "receptionist",
+          "ACCOUNTANT": "accountant",
+          "CLINIC_MANAGER": "manager",
+          "OPERATION_MANAGER": "executive"
+        }
+        
+        const dashboardRoute = roleMap[response.data.user.role] || "customer"
+        router.push(`/${dashboardRoute}`)
+      } else {
+        setError(response.message || "Invalid email or password")
+      }
+    } catch (error) {
+      setError("Network error. Please try again.")
+      console.error("Login error:", error)
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -51,11 +69,10 @@ export default function LoginPage() {
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">Username</Label>
               <Input
                 id="email"
-                type="email"
-                placeholder="Enter your email"
+                placeholder="Enter your username"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -76,8 +93,8 @@ export default function LoginPage() {
               />
             </div>
 
-            <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700">
-              Login
+            <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={isLoading}>
+              {isLoading ? "Logging in..." : "Login"}
             </Button>
 
             {error && (
@@ -86,6 +103,15 @@ export default function LoginPage() {
               </Alert>
             )}
           </form>
+
+          <div className="mt-6 text-center">
+            <p className="text-sm text-gray-600">
+              Dont have an account?{" "}
+              <Link href="/register" className="text-blue-600 hover:text-blue-500 font-medium">
+                Create account
+              </Link>
+            </p>
+          </div>
 
           <div className="mt-6 text-sm text-gray-600">
             <p className="font-semibold mb-2">Demo Accounts:</p>
