@@ -102,8 +102,13 @@ export default function AppointmentManagement() {
   const handleCancelAppointment = async () => {
     if (!selectedAppointment || !cancelReason.trim()) return
 
+    setIsLoading(true)
     try {
-      const response = await appointmentAPI.cancelAppointment(selectedAppointment.ma_lich_kham)
+      // Update appointment status to CANCELLED instead of deleting
+      const response = await appointmentAPI.updateAppointment(selectedAppointment.ma_lich_kham, {
+        trang_thai: "CANCELLED",
+        ghi_chu: `Cancelled: ${cancelReason}`
+      })
       
       if (response.success) {
         setSuccessMessage(`Appointment cancelled successfully. Confirmation sent via SMS and email.`)
@@ -116,23 +121,30 @@ export default function AppointmentManagement() {
         
         setTimeout(() => setSuccessMessage(""), 5000)
       } else {
-        setSuccessMessage(`Failed to cancel appointment: ${response.message}`)
+        setSuccessMessage(`Failed to cancel appointment: ${response.message || 'Unknown error'}`)
+        setTimeout(() => setSuccessMessage(""), 5000)
       }
     } catch (error) {
       console.error("Cancel appointment error:", error)
       setSuccessMessage("Failed to cancel appointment. Please try again.")
+      setTimeout(() => setSuccessMessage(""), 5000)
+    } finally {
+      setIsLoading(false)
     }
   }
 
   const handleRescheduleAppointment = async () => {
     if (!selectedAppointment || !rescheduleForm.newDate || !rescheduleForm.newTime) return
 
+    setIsLoading(true)
     try {
-      const newDateTime = `${rescheduleForm.newDate} ${rescheduleForm.newTime}:00`
+      // Format datetime to ISO string that backend expects
+      const newDateTime = new Date(`${rescheduleForm.newDate}T${rescheduleForm.newTime}:00`).toISOString()
       
       const response = await appointmentAPI.updateAppointment(selectedAppointment.ma_lich_kham, {
         ngay_gio_kham: newDateTime,
-        ghi_chu: rescheduleForm.reason || undefined
+        trang_thai: "SCHEDULED", // Ensure status remains scheduled after reschedule
+        ghi_chu: rescheduleForm.reason || selectedAppointment.ghi_chu
       })
       
       if (response.success) {
@@ -146,11 +158,15 @@ export default function AppointmentManagement() {
         
         setTimeout(() => setSuccessMessage(""), 5000)
       } else {
-        setSuccessMessage(`Failed to reschedule appointment: ${response.message}`)
+        setSuccessMessage(`Failed to reschedule appointment: ${response.message || 'Unknown error'}`)
+        setTimeout(() => setSuccessMessage(""), 5000)
       }
     } catch (error) {
       console.error("Reschedule appointment error:", error)
-      setSuccessMessage("Failed to reschedule appointment. Please try again.")
+      setSuccessMessage("Failed to reschedule appointment. Please check the date and time format.")
+      setTimeout(() => setSuccessMessage(""), 5000)
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -399,7 +415,7 @@ export default function AppointmentManagement() {
                   <Button
                     variant="destructive"
                     onClick={handleCancelAppointment}
-                    disabled={!cancelReason}
+                    disabled={!cancelReason || isLoading}
                   >
                     Cancel Appointment
                   </Button>
@@ -473,7 +489,7 @@ export default function AppointmentManagement() {
                   </Button>
                   <Button
                     onClick={handleRescheduleAppointment}
-                    disabled={!rescheduleForm.newDate || !rescheduleForm.newTime}
+                    disabled={!rescheduleForm.newDate || !rescheduleForm.newTime || isLoading}
                     className="bg-blue-600 hover:bg-blue-700"
                   >
                     Reschedule

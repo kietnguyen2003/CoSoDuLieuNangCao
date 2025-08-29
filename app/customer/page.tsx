@@ -9,7 +9,8 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Calendar, Download, User, FileText, Settings, Shield, Edit } from "lucide-react"
+import { Calendar, Download, User, FileText, Settings, Shield, Edit, FlaskConical, Eye, X, Pill, ClipboardList, Loader2 } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { clinicAPI, appointmentAPI, medicalRecordAPI, type MedicalRecord } from "@/lib/api"
 
 export default function CustomerDashboard() {
@@ -32,6 +33,8 @@ export default function CustomerDashboard() {
   const [specialties, setSpecialties] = useState<string[]>([])
   const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([])
   const [medicalRecords, setMedicalRecords] = useState<MedicalRecord[]>([])
+  const [selectedRecord, setSelectedRecord] = useState<any>(null)
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   
   const router = useRouter()
 
@@ -118,6 +121,12 @@ export default function CustomerDashboard() {
     } catch (error) {
       console.error("Failed to load medical records:", error)
     }
+  }
+
+  const handleViewRecordDetail = (record: MedicalRecord) => {
+    // Use the record data directly - no API call needed!
+    setSelectedRecord(record)
+    setIsDetailModalOpen(true)
   }
 
   const loadAvailableTimeSlots = async (clinicId: string, doctorId: string, date: string) => {
@@ -257,6 +266,10 @@ export default function CustomerDashboard() {
                   <Edit className="h-4 w-4 mr-2" />
                   Manage Appointments
                 </Button>
+                <Button onClick={() => router.push("/customer/lab-results")} variant="outline" size="sm">
+                  <FlaskConical className="h-4 w-4 mr-2" />
+                  Lab Results
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -277,14 +290,14 @@ export default function CustomerDashboard() {
                 <span>Book Appointment</span>
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
+            <CardContent className="space-y-6">
+              <div className="space-y-2 relative">
                 <Label htmlFor="clinic">Select Clinic</Label>
                 <Select value={selectedClinic} onValueChange={handleClinicChange}>
                   <SelectTrigger>
                     <SelectValue placeholder="Choose a clinic" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="z-50 max-h-60">
                     {clinics.map((clinic, index) => (
                       <SelectItem key={`clinic-${clinic.ma_phong_kham}-${index}`} value={clinic.ma_phong_kham}>
                         {clinic.ten_phong_kham}
@@ -294,13 +307,13 @@ export default function CustomerDashboard() {
                 </Select>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2 relative">
                 <Label htmlFor="specialty">Filter by Specialty (Optional)</Label>
                 <Select value={selectedSpecialty} onValueChange={handleSpecialtyChange} disabled={!selectedClinic}>
                   <SelectTrigger>
                     <SelectValue placeholder="All specialties" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="z-40 max-h-60">
                     <SelectItem value="all">All specialties</SelectItem>
                     {specialties.map((specialty, index) => (
                       <SelectItem key={`specialty-${specialty}-${index}`} value={specialty}>
@@ -311,13 +324,13 @@ export default function CustomerDashboard() {
                 </Select>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2 relative">
                 <Label htmlFor="doctor">Select Doctor</Label>
                 <Select value={selectedDoctor} onValueChange={handleDoctorChange} disabled={!selectedClinic}>
                   <SelectTrigger>
                     <SelectValue placeholder="Choose a doctor" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="z-30 max-h-60">
                     {previouslyVisitedDoctors && previouslyVisitedDoctors.length > 0 && (
                       <>
                         <div className="px-2 py-1 text-xs font-medium text-blue-600 bg-blue-50">
@@ -373,7 +386,7 @@ export default function CustomerDashboard() {
                 />
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2 relative">
                 <Label htmlFor="time">Available Time Slots</Label>
                 <Select 
                   value={selectedTime} 
@@ -393,7 +406,7 @@ export default function CustomerDashboard() {
                       } 
                     />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="z-20 max-h-40">
                     {availableTimeSlots.map((time, index) => (
                       <SelectItem key={`time-${time}-${index}`} value={time}>
                         {time}
@@ -451,10 +464,21 @@ export default function CustomerDashboard() {
                               <User className="h-4 w-4 ml-2" />
                               <span>Doctor</span>
                             </div>
-                            <Button size="sm" variant="outline" className="text-xs bg-transparent">
-                              <Download className="h-3 w-3 mr-1" />
-                              PDF
-                            </Button>
+                            <div className="flex space-x-1">
+                              <Button 
+                                size="sm" 
+                                variant="outline" 
+                                className="text-xs"
+                                onClick={() => handleViewRecordDetail(record)}
+                              >
+                                <Eye className="h-3 w-3 mr-1" />
+                                Details
+                              </Button>
+                              <Button size="sm" variant="outline" className="text-xs bg-transparent">
+                                <Download className="h-3 w-3 mr-1" />
+                                PDF
+                              </Button>
+                            </div>
                           </div>
                           <div className="space-y-1">
                             {record.trieu_chung && (
@@ -495,6 +519,185 @@ export default function CustomerDashboard() {
           </Card>
         </div>
       </div>
+
+      {/* Medical Record Detail Modal */}
+      <Dialog open={isDetailModalOpen} onOpenChange={setIsDetailModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto" onOpenAutoFocus={(e) => e.preventDefault()}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <FileText className="h-5 w-5 text-blue-600" />
+              <span>Chi tiết khám bệnh</span>
+              {selectedRecord && (
+                <span className="text-sm text-gray-500 ml-2">
+                  {new Date(selectedRecord.ngay_kham).toLocaleDateString()}
+                </span>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          
+          {selectedRecord ? (
+            <div className="space-y-6">
+              {/* Basic Info */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Thông tin cơ bản</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <strong>Bệnh nhân:</strong> {selectedRecord.ten_khach_hang}
+                    </div>
+                    <div>
+                      <strong>Bác sĩ khám:</strong> {selectedRecord.ten_bac_si}
+                    </div>
+                    <div>
+                      <strong>Phòng khám:</strong> {selectedRecord.ten_phong_kham}
+                    </div>
+                    <div>
+                      <strong>Ngày khám:</strong> {new Date(selectedRecord.ngay_kham).toLocaleDateString()}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Symptoms & Diagnosis */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Triệu chứng và Chẩn đoán</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {selectedRecord.trieu_chung && (
+                    <div>
+                      <strong className="text-red-600">Triệu chứng:</strong>
+                      <p className="mt-1 p-2 bg-red-50 rounded">{selectedRecord.trieu_chung}</p>
+                    </div>
+                  )}
+                  {selectedRecord.chan_doan && (
+                    <div>
+                      <strong className="text-blue-600">Chẩn đoán:</strong>
+                      <p className="mt-1 p-2 bg-blue-50 rounded">{selectedRecord.chan_doan}</p>
+                    </div>
+                  )}
+                  {selectedRecord.huong_dan_dieu_tri && (
+                    <div>
+                      <strong className="text-green-600">Hướng dẫn điều trị:</strong>
+                      <p className="mt-1 p-2 bg-green-50 rounded">{selectedRecord.huong_dan_dieu_tri}</p>
+                    </div>
+                  )}
+                  {selectedRecord.ma_icd10 && (
+                    <div>
+                      <strong>Mã ICD-10:</strong> {selectedRecord.ma_icd10}
+                    </div>
+                  )}
+                  {selectedRecord.ngay_tai_kham && (
+                    <div>
+                      <strong>Ngày tái khám:</strong> {new Date(selectedRecord.ngay_tai_kham).toLocaleDateString()}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Prescriptions */}
+              {selectedRecord.prescriptions && selectedRecord.prescriptions.length > 0 ? (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2 text-lg">
+                      <Pill className="h-5 w-5 text-green-600" />
+                      <span>Đơn thuốc</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {selectedRecord.prescriptions.map((prescription: any, index: number) => (
+                      <div key={index} className="border rounded-lg p-4 mb-4 bg-green-50">
+                        <div className="flex justify-between items-center mb-2">
+                          <strong>Đơn thuốc #{prescription.ma_don_thuoc}</strong>
+                          <span className="text-sm text-gray-600">
+                            {new Date(prescription.ngay_ke_don).toLocaleDateString()}
+                          </span>
+                        </div>
+                        {prescription.ghi_chu && (
+                          <p className="text-sm text-gray-600 mb-3">{prescription.ghi_chu}</p>
+                        )}
+                        <div className="space-y-2">
+                          {prescription.medicines?.map((med: any, medIndex: number) => (
+                            <div key={medIndex} className="bg-white p-3 rounded border">
+                              <div className="font-medium">{med.ten_thuoc}</div>
+                              <div className="text-sm text-gray-600">
+                                <div><strong>Số lượng:</strong> {med.so_luong}</div>
+                                <div><strong>Cách dùng:</strong> {med.cach_dung}</div>
+                                {med.ghi_chu && <div><strong>Ghi chú:</strong> {med.ghi_chu}</div>}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2 text-lg">
+                      <Pill className="h-5 w-5 text-gray-400" />
+                      <span>Đơn thuốc</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-center py-4 text-gray-500">
+                      Không có đơn thuốc cho lần khám này
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Lab Tests */}
+              {selectedRecord.lab_tests && selectedRecord.lab_tests.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2 text-lg">
+                      <ClipboardList className="h-5 w-5 text-purple-600" />
+                      <span>Kết quả xét nghiệm</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {selectedRecord.lab_tests.map((test: any, index: number) => (
+                      <div key={index} className="border rounded-lg p-4 mb-4 bg-purple-50">
+                        <div className="flex justify-between items-center mb-2">
+                          <strong>{test.loai_xet_nghiem}</strong>
+                          <span className="text-sm text-gray-600">
+                            {new Date(test.ngay_xet_nghiem).toLocaleDateString()}
+                          </span>
+                        </div>
+                        {test.ket_qua && (
+                          <div className="bg-white p-3 rounded border">
+                            <strong>Kết quả:</strong>
+                            <p className="mt-1">{test.ket_qua}</p>
+                          </div>
+                        )}
+                        {test.ghi_chu && (
+                          <p className="text-sm text-gray-600 mt-2">{test.ghi_chu}</p>
+                        )}
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Close Button */}
+              <div className="flex justify-end">
+                <Button onClick={() => setIsDetailModalOpen(false)} variant="outline">
+                  <X className="h-4 w-4 mr-2" />
+                  Đóng
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-12">
+              <p className="text-gray-500">Không có dữ liệu</p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

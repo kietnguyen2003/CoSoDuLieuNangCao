@@ -10,8 +10,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Save, FlaskConical, User, Calendar, Plus, Edit, Search, Clock } from "lucide-react"
-import { labTestAPI, medicalRecordAPI, type LabTest as APILabTest } from "@/lib/api"
+import { ArrowLeft, Save, FlaskConical, Calendar, Plus, Edit, Search } from "lucide-react"
+import { labTestAPI, medicalRecordAPI} from "@/lib/api"
 
 interface LabTestForm {
   ma_xet_nghiem?: string
@@ -363,15 +363,17 @@ export default function LabTestManagement() {
                       </Select>
                     </div>
 
+                               </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="ngay_xet_nghiem">Test Date</Label>
-                      <Input
-                        id="ngay_xet_nghiem"
-                        type="date"
-                        value={labTestForm.ngay_xet_nghiem}
-                        onChange={(e) => handleInputChange("ngay_xet_nghiem", e.target.value)}
-                      />
-                    </div>
+                        <Label htmlFor="ngay_xet_nghiem">Test Date</Label>
+                        <Input
+                          id="ngay_xet_nghiem"
+                          type="date"
+                          value={labTestForm.ngay_xet_nghiem}
+                          onChange={(e) => handleInputChange("ngay_xet_nghiem", e.target.value)}
+                        />
+                      </div>
                   </div>
 
                   {/* Test Type */}

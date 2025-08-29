@@ -10,8 +10,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Search, UserPlus, Calendar, Users } from "lucide-react"
+import { Search, UserPlus, Calendar, Users, Edit } from "lucide-react"
 import { customerAPI, clinicAPI, appointmentAPI } from "@/lib/api"
+import { CustomerModal } from "@/components/customer-modal"
 
 export default function ReceptionistDashboard() {
   const [userRole, setUserRole] = useState("")
@@ -27,11 +28,17 @@ export default function ReceptionistDashboard() {
   const [isLoading, setIsLoading] = useState(false)
   
   const [customers, setCustomers] = useState<any[]>([])
+  const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, total_pages: 0 })
   const [clinics, setClinics] = useState<any[]>([])
   const [doctors, setDoctors] = useState<any[]>([])
   const [specialties, setSpecialties] = useState<string[]>([])
   const [availableSlots, setAvailableSlots] = useState<string[]>([])
   const [receptionistClinic, setReceptionistClinic] = useState<string>("")
+  
+  // Modal state
+  const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false)
+  const [selectedCustomerForEdit, setSelectedCustomerForEdit] = useState<any>(null)
+  const [modalMode, setModalMode] = useState<"create" | "edit">("create")
   
   const router = useRouter()
 
@@ -57,16 +64,29 @@ export default function ReceptionistDashboard() {
     setReceptionistClinic("PK001") // This should be dynamic based on receptionist's profile
   }, [router])
 
-  const loadCustomers = async (search?: string) => {
+  const loadCustomers = async (search?: string, page: number = 1) => {
     setIsLoading(true)
     try {
-      const response = await customerAPI.getCustomers(search)
+      const response = await customerAPI.getCustomers({ search, page, limit: 20 })
       if (response.success && response.data) {
-        setCustomers(response.data)
+        // Check if response has the new pagination structure
+        if (response.data.customers && response.data.pagination) {
+          setCustomers(response.data.customers || [])
+          setPagination(response.data.pagination)
+        } else {
+          // Fallback for old API format
+          setCustomers(Array.isArray(response.data) ? response.data : [])
+          setPagination({ page: 1, limit: 20, total: Array.isArray(response.data) ? response.data.length : 0, total_pages: 1 })
+        }
+      } else {
+        setCustomers([])
+        setPagination({ page: 1, limit: 20, total: 0, total_pages: 0 })
       }
     } catch (error) {
       console.error("Failed to load customers:", error)
       setMessage("Failed to load customers")
+      setCustomers([])
+      setPagination({ page: 1, limit: 20, total: 0, total_pages: 0 })
     } finally {
       setIsLoading(false)
     }
@@ -123,11 +143,14 @@ export default function ReceptionistDashboard() {
 
 
 
-  const filteredPatients = customers.filter(
-    (customer) =>
-      (customer.ho_ten || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (customer.user_id || "").toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    loadCustomers(searchTerm, 1)
+  }
+
+  const handlePageChange = (newPage: number) => {
+    loadCustomers(searchTerm, newPage)
+  }
 
   const handleBookAppointment = async () => {
     if (!selectedCustomer || !selectedDoctor || !selectedDate || !selectedTime || !receptionistClinic) {
@@ -182,6 +205,26 @@ export default function ReceptionistDashboard() {
     }
   }, [receptionistClinic, selectedDoctor, selectedDate])
 
+  // Modal handlers
+  const handleCreateCustomer = () => {
+    setModalMode("create")
+    setSelectedCustomerForEdit(null)
+    setIsCustomerModalOpen(true)
+  }
+
+  const handleEditCustomer = (customer: any) => {
+    setModalMode("edit")
+    setSelectedCustomerForEdit(customer)
+    setIsCustomerModalOpen(true)
+  }
+
+  const handleModalSave = () => {
+    // Refresh customer list
+    loadCustomers()
+    setMessage("Customer saved successfully!")
+    setTimeout(() => setMessage(""), 3000)
+  }
+
   if (!userRole) return null
 
   return (
@@ -189,6 +232,24 @@ export default function ReceptionistDashboard() {
       <Navbar userRole={userRole} userEmail={userEmail} />
 
       <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+        {/* Quick Actions */}
+        <div className="mb-6">
+          <Card className="shadow-sm">
+            <CardContent className="p-4">
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={() => router.push("/receptionist/payments")} variant="outline" size="sm">
+                  <Search className="h-4 w-4 mr-2" />
+                  Payment Management
+                </Button>
+                <Button onClick={() => router.push("/receptionist/appointments")} variant="outline" size="sm">
+                  <Calendar className="h-4 w-4 mr-2" />
+                  Appointment Schedule
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
         <div className="space-y-6">
           {/* Patient Management Section */}
           <Card className="shadow-lg">
@@ -205,14 +266,16 @@ export default function ReceptionistDashboard() {
                   <Input
                     placeholder="Search customers by name or ID..."
                     value={searchTerm}
-                    onChange={(e) => {
-                      setSearchTerm(e.target.value)
-                      loadCustomers(e.target.value)
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        handleSearchSubmit(e)
+                      }
                     }}
                     className="pl-10"
                   />
                 </div>
-                <Button className="bg-blue-600 hover:bg-blue-700">
+                <Button className="bg-blue-600 hover:bg-blue-700" onClick={handleCreateCustomer}>
                   <UserPlus className="h-4 w-4 mr-2" />
                   Create Customer
                 </Button>
@@ -231,22 +294,90 @@ export default function ReceptionistDashboard() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredPatients.map((customer) => (
-                        <TableRow key={customer.user_id}>
-                          <TableCell className="font-medium">{customer.user_id}</TableCell>
-                          <TableCell>{customer.ho_ten}</TableCell>
-                          <TableCell>{customer.so_dien_thoai}</TableCell>
-                          <TableCell>{customer.ngay_dang_ky?.split('T')[0]}</TableCell>
-                          <TableCell>
-                            <Button size="sm" variant="outline">
-                              View Profile
-                            </Button>
+                      {isLoading ? (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center py-8">
+                            Loading customers...
                           </TableCell>
                         </TableRow>
-                      ))}
+                      ) : customers.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center py-8 text-gray-500">
+                            No customers found
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        customers.map((customer) => (
+                          <TableRow key={customer.user_id}>
+                            <TableCell className="font-medium">{customer.user_id}</TableCell>
+                            <TableCell>{customer.ho_ten}</TableCell>
+                            <TableCell>{customer.so_dien_thoai}</TableCell>
+                            <TableCell>{customer.ngay_dang_ky?.split('T')[0]}</TableCell>
+                            <TableCell>
+                              <div className="flex space-x-2">
+                                <Button size="sm" variant="outline" onClick={() => handleEditCustomer(customer)}>
+                                  <Edit className="h-3 w-3 mr-1" />
+                                  Edit
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
                     </TableBody>
                   </Table>
                 </div>
+                
+                {/* Pagination Controls */}
+                {pagination.total_pages > 1 && (
+                  <div className="flex items-center justify-between px-4 py-3 border-t">
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handlePageChange(pagination.page - 1)}
+                        disabled={pagination.page === 1}
+                      >
+                        Previous
+                      </Button>
+                      
+                      <div className="flex items-center space-x-1">
+                        {(() => {
+                          let pagesToShow = [];
+                          if (pagination.total_pages <= 5) {
+                            pagesToShow = Array.from({ length: pagination.total_pages }, (_, i) => i + 1);
+                          } else if (pagination.page <= 3) {
+                            pagesToShow = [1, 2, 3, 4, 5];
+                          } else if (pagination.page >= pagination.total_pages - 2) {
+                            pagesToShow = Array.from({ length: 5 }, (_, i) => pagination.total_pages - 4 + i);
+                          } else {
+                            pagesToShow = Array.from({ length: 5 }, (_, i) => pagination.page - 2 + i);
+                          }
+                          
+                          return pagesToShow.map(page => (
+                            <Button
+                              key={`page-${page}`}
+                              variant={page === pagination.page ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => handlePageChange(page)}
+                            >
+                              {page}
+                            </Button>
+                          ));
+                        })()}
+                      </div>
+                      
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handlePageChange(pagination.page + 1)}
+                        disabled={pagination.page === pagination.total_pages}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -336,8 +467,8 @@ export default function ReceptionistDashboard() {
                     </SelectTrigger>
                     <SelectContent>
                       {availableSlots.length > 0 ? (
-                        availableSlots.map((time) => (
-                          <SelectItem key={time} value={time}>
+                        availableSlots.map((time, index) => (
+                          <SelectItem key={`${selectedDoctor}-${selectedDate}-${index}-${time}`} value={time}>
                             {time}
                           </SelectItem>
                         ))
@@ -364,6 +495,15 @@ export default function ReceptionistDashboard() {
           </Card>
         </div>
       </div>
+
+      {/* Customer Modal */}
+      <CustomerModal
+        isOpen={isCustomerModalOpen}
+        onClose={() => setIsCustomerModalOpen(false)}
+        customer={selectedCustomerForEdit}
+        onSave={handleModalSave}
+        mode={modalMode}
+      />
     </div>
   )
 }

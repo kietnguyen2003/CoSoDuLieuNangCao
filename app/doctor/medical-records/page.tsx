@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Navbar } from "@/components/navbar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -25,16 +25,19 @@ export default function MedicalRecords() {
   const [records, setRecords] = useState<MedicalRecord[]>([])
   const [patients, setPatients] = useState<any[]>([])
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   // Form state - using database field names
   const [recordForm, setRecordForm] = useState({
     ma_customer: "",
     ten_khach_hang: "",
     ngay_kham: new Date().toISOString().split('T')[0],
+    ly_do_kham: "",
     trieu_chung: "",
     chan_doan: "",
     ma_icd10: "",
     huong_dan_dieu_tri: "",
+    ghi_chu: "",
     ngay_tai_kham: ""
   })
 
@@ -62,7 +65,13 @@ export default function MedicalRecords() {
     // Load initial data
     loadMedicalRecords()
     loadPatients()
-  }, [router])
+    
+    // Check URL params for specific record
+    const recordParam = searchParams.get('record')
+    if (recordParam) {
+      loadSpecificRecord(recordParam)
+    }
+  }, [router, searchParams])
 
   const loadMedicalRecords = async () => {
     setIsLoading(true)
@@ -106,6 +115,34 @@ export default function MedicalRecords() {
     }
   }
 
+  const loadSpecificRecord = async (recordId: string) => {
+    try {
+      const response = await medicalRecordAPI.getMedicalRecord(recordId)
+      if (response.success && response.data) {
+        setSelectedRecord(response.data)
+        setIsEditing(true)
+        // Fill form with record data
+        setRecordForm({
+          ma_customer: response.data.ma_customer || "",
+          ten_khach_hang: response.data.ten_khach_hang || "",
+          ngay_kham: response.data.ngay_kham ? response.data.ngay_kham.split('T')[0] : "",
+          ly_do_kham: response.data.ly_do_kham || "",
+          trieu_chung: response.data.trieu_chung || "",
+          chan_doan: response.data.chan_doan || "",
+          ma_icd10: response.data.ma_icd10 || "",
+          huong_dan_dieu_tri: response.data.huong_dan_dieu_tri || "",
+          ghi_chu: response.data.ghi_chu || "",
+          ngay_tai_kham: response.data.ngay_tai_kham ? response.data.ngay_tai_kham.split('T')[0] : ""
+        })
+      } else {
+        setError(`Cannot find medical record: ${recordId}`)
+      }
+    } catch (error) {
+      console.error("Failed to load specific record:", error)
+      setError(`Failed to load record: ${recordId}`)
+    }
+  }
+
   const handleInputChange = (field: string, value: string) => {
     setRecordForm(prev => ({ ...prev, [field]: value }))
   }
@@ -132,9 +169,9 @@ export default function MedicalRecords() {
     }
   }
 
-  const handleSave = async () => {
+  const handleSave = async (type = "finalized") => {
     if (!recordForm.ma_customer || !recordForm.trieu_chung || !recordForm.chan_doan) {
-      setError("Please fill in required fields: Patient, Symptoms, and Diagnosis")
+      setError("Vui lòng điền đầy đủ các trường bắt buộc: Bệnh nhân, Triệu chứng, và Chẩn đoán")
       return
     }
 
@@ -184,10 +221,12 @@ export default function MedicalRecords() {
       ma_customer: "",
       ten_khach_hang: "",
       ngay_kham: new Date().toISOString().split('T')[0],
+      ly_do_kham: "",
       trieu_chung: "",
       chan_doan: "",
       ma_icd10: "",
       huong_dan_dieu_tri: "",
+      ghi_chu: "",
       ngay_tai_kham: ""
     })
   }
@@ -201,10 +240,12 @@ export default function MedicalRecords() {
       ma_customer: record.ma_customer || "",
       ten_khach_hang: record.ten_khach_hang || "",
       ngay_kham: recordDate,
+      ly_do_kham: record.ly_do_kham || "",
       trieu_chung: record.trieu_chung || "",
       chan_doan: record.chan_doan || "",
       ma_icd10: record.ma_icd10 || "",
       huong_dan_dieu_tri: record.huong_dan_dieu_tri || "",
+      ghi_chu: record.ghi_chu || "",
       ngay_tai_kham: followUpDate
     })
     setIsEditing(true)
@@ -323,21 +364,21 @@ export default function MedicalRecords() {
                 <span>{selectedRecord ? "Edit Medical Record" : "Create Medical Record"}</span>
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-6">
               {isEditing ? (
                 <>
                   {/* Patient Selection */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="patientId">Patient</Label>
-                      <Select value={recordForm.patientId} onValueChange={handlePatientSelect}>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2 relative">
+                      <Label htmlFor="patientId">Bệnh nhân</Label>
+                      <Select value={recordForm.ma_customer} onValueChange={handlePatientSelect}>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select patient" />
+                          <SelectValue placeholder="Chọn bệnh nhân" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="z-50">
                           {patients.map((patient) => (
-                            <SelectItem key={patient.id} value={patient.id}>
-                              {patient.name} (ID: {patient.id})
+                            <SelectItem key={patient.ma_customer} value={patient.ma_customer}>
+                              {patient.ten_khach_hang}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -345,49 +386,49 @@ export default function MedicalRecords() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="date">Date</Label>
+                      <Label htmlFor="date">Ngày khám</Label>
                       <Input
                         id="date"
                         type="date"
-                        value={recordForm.date}
-                        onChange={(e) => handleInputChange("date", e.target.value)}
+                        value={recordForm.ngay_kham}
+                        onChange={(e) => handleInputChange("ngay_kham", e.target.value)}
                       />
                     </div>
                   </div>
 
                   {/* Chief Complaint */}
                   <div className="space-y-2">
-                    <Label htmlFor="chiefComplaint">Chief Complaint</Label>
+                    <Label htmlFor="chiefComplaint">Lý do khám</Label>
                     <Input
                       id="chiefComplaint"
-                      value={recordForm.chiefComplaint}
-                      onChange={(e) => handleInputChange("chiefComplaint", e.target.value)}
-                      placeholder="Patient's main concern..."
+                      value={recordForm.ly_do_kham}
+                      onChange={(e) => handleInputChange("ly_do_kham", e.target.value)}
+                      placeholder="Lý do chính khiến bệnh nhân đến khám..."
                     />
                   </div>
 
                   {/* Symptoms */}
                   <div className="space-y-2">
-                    <Label htmlFor="symptoms">Symptoms & History</Label>
+                    <Label htmlFor="symptoms">Triệu chứng & Tiền sử</Label>
                     <textarea
                       id="symptoms"
                       className="w-full p-2 border rounded-md"
                       rows={3}
-                      value={recordForm.symptoms}
-                      onChange={(e) => handleInputChange("symptoms", e.target.value)}
-                      placeholder="Detailed symptoms and patient history..."
+                      value={recordForm.trieu_chung}
+                      onChange={(e) => handleInputChange("trieu_chung", e.target.value)}
+                      placeholder="Mô tả chi tiết triệu chứng và tiền sử bệnh của bệnh nhân..."
                     />
                   </div>
 
                   {/* Diagnosis */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="diagnosis">Diagnosis</Label>
-                      <Select value={recordForm.icdCode} onValueChange={handleDiagnosisSelect}>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2 relative">
+                      <Label htmlFor="diagnosis">Chẩn đoán</Label>
+                      <Select value={recordForm.ma_icd10} onValueChange={handleDiagnosisSelect}>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select diagnosis" />
+                          <SelectValue placeholder="Chọn chẩn đoán" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="z-50 max-h-60">
                           {commonDiagnoses.map((diagnosis) => (
                             <SelectItem key={diagnosis.code} value={diagnosis.code}>
                               {diagnosis.name} ({diagnosis.code})
@@ -398,61 +439,62 @@ export default function MedicalRecords() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="icdCode">ICD Code</Label>
+                      <Label htmlFor="icdCode">Mã ICD-10</Label>
                       <Input
                         id="icdCode"
-                        value={recordForm.icdCode}
-                        onChange={(e) => handleInputChange("icdCode", e.target.value)}
-                        placeholder="ICD-10 code"
+                        value={recordForm.ma_icd10}
+                        onChange={(e) => handleInputChange("ma_icd10", e.target.value)}
+                        placeholder="Mã ICD-10"
                       />
                     </div>
                   </div>
 
                   {/* Custom Diagnosis */}
                   <div className="space-y-2">
-                    <Label htmlFor="customDiagnosis">Custom Diagnosis (if not in list)</Label>
+                    <Label htmlFor="customDiagnosis">Chẩn đoán tự nhập (nếu không có trong danh sách)</Label>
                     <Input
                       id="customDiagnosis"
-                      value={recordForm.diagnosis}
-                      onChange={(e) => handleInputChange("diagnosis", e.target.value)}
-                      placeholder="Enter custom diagnosis..."
+                      value={recordForm.chan_doan}
+                      onChange={(e) => handleInputChange("chan_doan", e.target.value)}
+                      placeholder="Nhập chẩn đoán chi tiết..."
                     />
                   </div>
 
                   {/* Prescription */}
                   <div className="space-y-2">
-                    <Label htmlFor="prescription">Prescription</Label>
+                    <Label htmlFor="prescription">Hướng dẫn điều trị</Label>
                     <textarea
                       id="prescription"
                       className="w-full p-2 border rounded-md"
                       rows={3}
-                      value={recordForm.prescription}
-                      onChange={(e) => handleInputChange("prescription", e.target.value)}
-                      placeholder="Medications, dosages, and instructions..."
+                      value={recordForm.huong_dan_dieu_tri}
+                      onChange={(e) => handleInputChange("huong_dan_dieu_tri", e.target.value)}
+                      placeholder="Hướng dẫn điều trị, thuốc và liều lượng sử dụng..."
                     />
                   </div>
 
                   {/* Notes */}
                   <div className="space-y-2">
-                    <Label htmlFor="notes">Clinical Notes</Label>
+                    <Label htmlFor="notes">Ghi chú lâm sàng</Label>
                     <textarea
                       id="notes"
                       className="w-full p-2 border rounded-md"
                       rows={3}
-                      value={recordForm.notes}
-                      onChange={(e) => handleInputChange("notes", e.target.value)}
-                      placeholder="Additional clinical observations..."
+                      value={recordForm.ghi_chu}
+                      onChange={(e) => handleInputChange("ghi_chu", e.target.value)}
+                      placeholder="Các ghi chú bổ sung về quá trình khám..."
                     />
                   </div>
 
                   {/* Follow-up */}
                   <div className="space-y-2">
-                    <Label htmlFor="followUp">Follow-up Instructions</Label>
+                    <Label htmlFor="followUp">Ngày tái khám</Label>
                     <Input
                       id="followUp"
-                      value={recordForm.followUp}
-                      onChange={(e) => handleInputChange("followUp", e.target.value)}
-                      placeholder="Next appointment or follow-up instructions..."
+                      type="date"
+                      value={recordForm.ngay_tai_kham}
+                      onChange={(e) => handleInputChange("ngay_tai_kham", e.target.value)}
+                      placeholder="Chọn ngày tái khám..."
                     />
                   </div>
 
@@ -467,10 +509,10 @@ export default function MedicalRecords() {
                     <Button 
                       onClick={() => handleSave("finalized")} 
                       className="bg-blue-600 hover:bg-blue-700"
-                      disabled={!recordForm.patientId || !recordForm.chiefComplaint || !recordForm.diagnosis}
+                      disabled={!recordForm.ma_customer || !recordForm.trieu_chung || !recordForm.chan_doan || isSaving}
                     >
                       <Save className="h-4 w-4 mr-2" />
-                      Finalize Record
+                      {isSaving ? "Đang lưu..." : "Finalize Record"}
                     </Button>
                   </div>
                 </>

@@ -15,6 +15,8 @@ export function Navbar({ userRole, userEmail }: NavbarProps) {
   const handleLogout = () => {
     localStorage.removeItem("userRole")
     localStorage.removeItem("userEmail")
+    localStorage.removeItem("authToken")
+    localStorage.removeItem("userId")
     router.push("/")
   }
 

@@ -191,7 +191,10 @@ export const userAPI = {
   }) => {
     return makeRequest('/users/password', {
       method: 'PUT',
-      body: JSON.stringify(passwordData),
+      body: JSON.stringify({
+        old_password: passwordData.current_password,
+        new_password: passwordData.new_password
+      }),
     })
   },
 }
@@ -453,12 +456,22 @@ export const scheduleAPI = {
 
 // Customer API (for receptionist)
 export const customerAPI = {
-  getCustomers: async (search?: string) => {
-    const params = new URLSearchParams()
-    if (search) params.append('search', search)
+  getCustomers: async (params?: { search?: string, page?: number, limit?: number }) => {
+    const urlParams = new URLSearchParams()
+    if (params?.search) urlParams.append('search', params.search)
+    if (params?.page) urlParams.append('page', params.page.toString())
+    if (params?.limit) urlParams.append('limit', params.limit.toString())
     
-    const endpoint = '/customers' + (params.toString() ? `?${params.toString()}` : '')
-    return makeRequest<any[]>(endpoint)
+    const endpoint = '/customers' + (urlParams.toString() ? `?${urlParams.toString()}` : '')
+    return makeRequest<{
+      customers: any[]
+      pagination: {
+        page: number
+        limit: number
+        total: number
+        total_pages: number
+      }
+    }>(endpoint)
   },
 
   getCustomer: async (id: string) => {
@@ -481,7 +494,219 @@ export const customerAPI = {
       body: JSON.stringify(customerData),
     })
   },
+
+  updateCustomer: async (id: string, customerData: {
+    ho_ten?: string
+    so_dien_thoai?: string
+    email?: string
+    ngay_sinh?: string
+    gioi_tinh?: string
+    dia_chi?: string
+    ma_bao_hiem?: string
+  }) => {
+    return makeRequest(`/customers/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(customerData),
+    })
+  },
 }
+
+// Payment API
+export const paymentAPI = {
+  getPayments: async (filters?: { 
+    page?: number 
+    limit?: number
+    status?: string
+    from_date?: string
+    to_date?: string
+    ma_phong_kham?: string
+  }) => {
+    const params = new URLSearchParams()
+    if (filters?.page) params.append('page', filters.page.toString())
+    if (filters?.limit) params.append('limit', filters.limit.toString())
+    if (filters?.status) params.append('status', filters.status)
+    if (filters?.from_date) params.append('from_date', filters.from_date)
+    if (filters?.to_date) params.append('to_date', filters.to_date)
+    if (filters?.ma_phong_kham) params.append('ma_phong_kham', filters.ma_phong_kham)
+    
+    const endpoint = '/payments' + (params.toString() ? `?${params.toString()}` : '')
+    return makeRequest<any[]>(endpoint)
+  },
+
+  getPayment: async (id: string) => {
+    return makeRequest<any>(`/payments/${id}`)
+  },
+
+  createPayment: async (paymentData: {
+    ma_lich_kham: string
+    tong_tien: number
+    phuong_thuc_thanh_toan: string
+  }) => {
+    return makeRequest<{ ma_thanh_toan: string }>('/payments', {
+      method: 'POST',
+      body: JSON.stringify(paymentData),
+    })
+  },
+
+  updatePayment: async (id: string, updateData: {
+    trang_thai?: string
+    phuong_thuc_thanh_toan?: string
+  }) => {
+    return makeRequest(`/payments/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(updateData),
+    })
+  },
+
+  getSummary: async (filters?: {
+    from_date?: string
+    to_date?: string
+  }) => {
+    const params = new URLSearchParams()
+    if (filters?.from_date) params.append('from_date', filters.from_date)
+    if (filters?.to_date) params.append('to_date', filters.to_date)
+    
+    const endpoint = '/payments/summary' + (params.toString() ? `?${params.toString()}` : '')
+    return makeRequest<{
+      tong_doanh_thu: number
+      so_giao_dich: number
+      tien_mat: number
+      the_ngan_hang: number
+      chuyen_khoan: number
+      giao_dich_thanh_cong: number
+      giao_dich_that_bai: number
+    }>(endpoint)
+  },
+}
+
+// Salary API
+export const salaryAPI = {
+  calculateDoctor: async (data: {
+    thang: number
+    nam: number
+  }) => {
+    return makeRequest<{
+      so_bac_si_tinh_luong: string
+      thang: number
+      nam: number
+    }>('/salaries/calculate-doctor', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  },
+
+  getSalaries: async (filters?: {
+    page?: number
+    limit?: number
+    thang?: number
+    nam?: number
+    ma_user?: string
+  }) => {
+    const params = new URLSearchParams()
+    if (filters?.page) params.append('page', filters.page.toString())
+    if (filters?.limit) params.append('limit', filters.limit.toString())
+    if (filters?.thang) params.append('thang', filters.thang.toString())
+    if (filters?.nam) params.append('nam', filters.nam.toString())
+    if (filters?.ma_user) params.append('ma_user', filters.ma_user)
+    
+    const endpoint = '/salaries' + (params.toString() ? `?${params.toString()}` : '')
+    return makeRequest<any[]>(endpoint)
+  },
+
+  getSalary: async (id: string) => {
+    return makeRequest<any>(`/salaries/${id}`)
+  },
+
+  updateSalary: async (id: string, updateData: {
+    thuong?: number
+    ghi_chu?: string
+  }) => {
+    return makeRequest(`/salaries/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(updateData),
+    })
+  },
+
+  deleteSalary: async (id: string) => {
+    return makeRequest(`/salaries/${id}`, {
+      method: 'DELETE',
+    })
+  },
+
+  getSummary: async (filters?: {
+    thang?: number
+    nam?: number
+  }) => {
+    const params = new URLSearchParams()
+    if (filters?.thang) params.append('thang', filters.thang.toString())
+    if (filters?.nam) params.append('nam', filters.nam.toString())
+    
+    const endpoint = '/salaries/summary' + (params.toString() ? `?${params.toString()}` : '')
+    return makeRequest<{
+      tong_chi_luong: number
+      so_nhan_vien: number
+      luong_trung_binh: number
+      chi_tiet_theo_chuc_vu: any
+    }>(endpoint)
+  },
+}
+
+// Report API (for executives and managers)
+export const reportAPI = {
+  getExecutiveReport: async (period: 'weekly' | 'monthly' | 'quarterly' | 'yearly') => {
+    return makeRequest<{
+      totalAppointments: number
+      totalRevenue: number
+      doctorUtilization: number
+      patientSatisfaction: number
+      growthRate: number
+      totalPatients: number
+      cancelledAppointments: number
+      averageWaitTime: number
+      operatingCosts: number
+    }>(`/reports/executive/${period}`)
+  },
+
+  getClinicPerformance: async () => {
+    return makeRequest<any[]>('/reports/clinic-performance')
+  },
+
+  getDoctorPerformance: async () => {
+    return makeRequest<any[]>('/reports/doctor-performance')
+  },
+
+  getPatientStats: async (filters?: {
+    from_date?: string
+    to_date?: string
+  }) => {
+    const params = new URLSearchParams()
+    if (filters?.from_date) params.append('from_date', filters.from_date)
+    if (filters?.to_date) params.append('to_date', filters.to_date)
+    
+    const endpoint = '/reports/patients' + (params.toString() ? `?${params.toString()}` : '')
+    return makeRequest<any>(endpoint)
+  },
+
+  getRevenueByClinic: async (filters?: {
+    from_date?: string
+    to_date?: string
+  }) => {
+    const params = new URLSearchParams()
+    if (filters?.from_date) params.append('from_date', filters.from_date)
+    if (filters?.to_date) params.append('to_date', filters.to_date)
+    
+    const endpoint = '/reports/revenue-by-clinic' + (params.toString() ? `?${params.toString()}` : '')
+    return makeRequest<any[]>(endpoint)
+  },
+
+  exportReport: async (reportType: string, period: string) => {
+    return makeRequest(`/reports/export`, {
+      method: 'POST',
+      body: JSON.stringify({ report_type: reportType, period }),
+    })
+  },
+}
+
 
 // Export default API object
 export default {
@@ -494,4 +719,7 @@ export default {
   clinic: clinicAPI,
   schedule: scheduleAPI,
   customer: customerAPI,
+  payment: paymentAPI,
+  salary: salaryAPI,
+  report: reportAPI,
 }
